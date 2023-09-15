@@ -1,0 +1,207 @@
+---
+title: "Analyzing Pima Indians Diabetes"
+output: 
+  bookdown::html_document2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+Diabetes is a health condition that is caused by excessive glucose levels in blood. Research shows that more than half the Pima Indians over 35 years of age have type 2 diabetes^1^. Hence we decided to work with the Pima Indians’ Diabetes dataset^2^ as furthermore, according to the CDC^3^, diabetes was found to have been more prevalent in women than men. Statistics from the World Health Organisation showed the number of people diagnosed with diabetes have significantly rose from 108 million to 422 million in 2014^4^  which is a concerning number. Hence the main objective of our study is to determine which factors have the most significant impact on diabetes in women specifically. Common types of diabetes^5^ include Type 1, Type 2 and Gestational Diabetes. Type 1 involves inability to produce glucose which is usually an inherited condition. Type 2 involves the underproduction of insulin to regulate the amount of glucose which is usually preventable while gestational diabetes is diabetes that is diagnosed during pregnancy. The study will be in accordance with these study questions that would provide a more thorough research to achieve the main objective:
+
+1) Which variables have a correlation with one another? 
+2) Which variable(s) affect the variable ‘glucose’ directly, considering glucose levels directly impact diabetes.
+
+# Methods
+
+## Data preparation
+In this project, we are concerned with finding the variables that have a direct relationship with diabetes and we will work with the diabetes data containing information of PIMA Indian females, 21 years and above. The dataset specifically contains information of 768 females. There are a total of 9 variables, one of which is the outcome categorical variable, ‘diabetes’, where “pos” is inputted if diabetes is present and “neg” is inputted if diabetes is not present. The other 8 numeric variables include ‘pregnant’, ‘glucose’, ‘pressure’, ‘triceps’, ‘insulin’, ‘mass’, ‘pedigree’ and ‘age’. 
+```{r}
+library(mlbench)
+library(ggplot2)
+library(corrplot)
+library(dplyr)
+library(caret)
+library(gridExtra)
+data("PimaIndiansDiabetes")
+summary(PimaIndiansDiabetes)
+```
+
+## Dealing with zero values
+Due to the zero values in ‘glucose’, ’pressure’, ’triceps’, ’insulin’ and ’mass’, we will replace these values with NA. As removing all the missing values would result in significant information loss, we used the kNN imputation method which adopts the k-Nearest Neighbours approach. The missing values can then be estimated using completed values of neighboring observations^6^. We use the function kNN(data,variable,k) to impute all the missing values. “PimaIndiansDiabetes1” is created which contains all the imputed values. 
+
+```{r}
+#Replace zero values by NA
+PimaIndiansDiabetes$glucose[ PimaIndiansDiabetes$glucose == 0 ] <- NA
+PimaIndiansDiabetes$pressure[ PimaIndiansDiabetes$pressure == 0 ] <- NA
+PimaIndiansDiabetes$triceps[ PimaIndiansDiabetes$triceps == 0 ] <- NA
+PimaIndiansDiabetes$insulin[ PimaIndiansDiabetes$insulin == 0 ] <- NA
+PimaIndiansDiabetes$mass[ PimaIndiansDiabetes$mass == 0 ] <- NA
+
+#kNN imputation
+library(VIM)
+PimaIndiansDiabetes1<-kNN(PimaIndiansDiabetes,
+                         variable=c("glucose","pressure",
+                                    "triceps","insulin","mass"),k=5)
+PimaIndiansDiabetes1<-select(PimaIndiansDiabetes1,pregnant:diabetes)
+```
+## Preliminary Exploratory Analysis
+Exploring the new dataset, we made use of a bar graph (See Figure \@ref(fig:gg-oz-plot)) to analyse the proportion of women that were found to have been diagnosed with diabetes. There were 500 women who tested negative and 268 women tested positive for diabetes which indicated a significant proportion testing positive still.
+
+```{r gg-oz-plot,fig.cap="Box plot showing the number of women diagnosed with diabetes",fig.align='center'}
+ggplot(PimaIndiansDiabetes1,aes(x=diabetes,fill = diabetes )) + geom_bar() + ggtitle("Distribution of Outcome variable")
+```
+
+
+We coded for the correlation matrix to analyse the relationship between the numerical variables, hence dealing with our first study question. 
+
+```{r gg-oz-plot2,fig.cap="Correlation coefficient plot between the predictor variables",fig.align='center'}
+#Remove diabetes column
+PimaIndiansDiabetes2<-select(PimaIndiansDiabetes1,-diabetes)
+#correlation matrix
+corrplot(cor(PimaIndiansDiabetes2),method="number",type="lower")
+```
+
+As observed from Figure \@ref(fig:gg-oz-plot2), ‘insulin’ and ‘glucose’, ‘mass’ and ‘triceps’, ‘age’ and ‘pregnant’ had a high linear correlation. It can also be seen that ‘pedigree’ and ‘pregnant’ had a weak negative correlation coefficient while ‘Insulin’ and ‘glucose’ had the highest positive correlation coefficient signalling the strongest relationship. The relationship between ‘insulin’ and ‘glucose’, ‘mass’ and ‘triceps’ can be further supported by the scatter plots below (See Figure \@ref(fig:gg-oz-plot3)) where diabetic women were shown to have higher levels of insulin and glucose while women with lower values of mass and triceps tested negative for diabetes.
+
+```{r gg-oz-plot3,fig.cap="Scatter plots for ‘glucose’ and ‘insulin’, ‘mass’ and ‘triceps’",fig.align='center'}
+ggp1<-ggplot(PimaIndiansDiabetes1,aes(x=insulin,y=glucose,col=diabetes))+geom_point()
+ggp2<-ggplot(PimaIndiansDiabetes1,aes(x=mass,y=triceps,col=diabetes))+geom_point()
+grid.arrange(ggp1,ggp2,ncol=2)
+```
+To give us a better understanding of each variable, different graphs (See Figure \@ref(fig:gg-oz-plot4),\@ref(fig:gg-oz-plot5)) were used to help with our preliminary findings.
+```{r gg-oz-plot4,fig.cap="Box plots of diabetes against other variables",fig.align='center'}
+plot1<-ggplot(PimaIndiansDiabetes1,aes(x=diabetes,y=pregnant))+geom_boxplot()
+plot2<-ggplot(PimaIndiansDiabetes1,aes(x=diabetes,y=glucose))+geom_boxplot()
+plot3<-ggplot(PimaIndiansDiabetes1,aes(x=diabetes,y=mass))+geom_boxplot()
+plot4<-ggplot(PimaIndiansDiabetes1,aes(x=diabetes,y=pressure))+geom_boxplot()
+plot5<-ggplot(PimaIndiansDiabetes1,aes(x=diabetes,y=triceps))+geom_boxplot()
+plot6<-ggplot(PimaIndiansDiabetes1,aes(x=diabetes,y=insulin))+geom_boxplot()
+plot7<-ggplot(PimaIndiansDiabetes1,aes(x=diabetes,y=age))+geom_boxplot()
+plot8<-ggplot(PimaIndiansDiabetes1,aes(x=diabetes,y=pedigree))+geom_boxplot()
+grid.arrange(plot1,plot2,plot3,plot4,plot5,plot6,plot7,plot8,ncol=3)
+```
+
+```{r gg-oz-plot5,fig.cap="Glucose bar graph and Mass histogram",fig.align='center'}
+glucosebar<-ggplot(PimaIndiansDiabetes1,aes(glucose,fill=diabetes))+ geom_bar() + ggtitle("Barplot of glucose")
+masshist<-ggplot(PimaIndiansDiabetes1,aes(mass,fill=diabetes))+ geom_histogram() + ggtitle("Histogram of mass")
+grid.arrange(glucosebar,masshist,ncol=2)
+```
+
+Comparing the median between the ‘negative’ and ‘positive’ of each variable boxplot (See Figure \@ref(fig:gg-oz-plot4), we observed that diabetic women have had more pregnancies and higher insulin levels. However, there isn’t an elaborate scientific explanation as to whether or not there was a direct relation. There was also a stark difference in glucose levels between ‘positive’ and ‘negative’ with its bar plot (See Figure \@ref(fig:gg-oz-plot5) further showing that non-diabetics had lower glucose levels ranging from 80-120. From a mass histogram (See Figure \@ref(fig:gg-oz-plot5) we came up with, the diabetics all had a BMI of more than 23, which is above that of an appropriate range. As the graphs for pedigree, pressure and age did not show much difference, we concluded that these may not be significant factors.
+
+## Methodology
+In this section, we will deal with the machine learning techniques for prediction and classification. Linear regression was chosen for prediction as it provided a more explicit model form for interpretation and a well established statistical inference which allowed us to analyse which predicted variable had the most direct relation to the variable ‘glucose’ measuring glucose levels. Classification is used to specify the class to which data elements belong to. We worked with logistic regression as it relates with our main objective that is to determine which variables were most significant towards our categorical outcome variable, ‘diabetes’. To split our data into training and test sets, we applied the 80/20 splitting rule which randomly selected 80% of the data into the training set while the remaining was put into a test set.
+```{r}
+#Split data
+set.seed(100)
+training.idx <- sample(1: nrow(PimaIndiansDiabetes2), size=nrow(PimaIndiansDiabetes2)*0.8)
+train.data  <-PimaIndiansDiabetes2[training.idx, ]
+test.data <- PimaIndiansDiabetes2[-training.idx, ]
+```
+
+### Prediction: Linear Regression
+We want to find out which predictor variables have the highest significance towards ‘glucose’ as diabetes itself is diagnosed by measuring the blood glucose concentration. The diabetes column from the dataset was removed before applying linear regression as we are only interested in the case before diabetes is detected. To ensure further accuracy, we also applied the KNN regression and compared the RMSE values which were 23.39922 and 23.17604 respectively. Hence, since the RMSE for linear regression was lower, we conclude that linear regression would be a better model to work with.
+```{r}
+#linear regression
+lmodel<-lm(glucose~.,data=train.data)
+summary(lmodel)
+predictions<-predict(lmodel,test.data)
+RMSE(predictions,test.data$glucose)
+#RMSE value is 23.17604
+```
+```{r}
+#kNN regression
+set.seed(101)
+model <- train(
+  glucose~., data = train.data, method = "knn",
+  trControl = trainControl("cv", number = 10),
+  preProcess = c("center","scale"),
+  tuneLength = 10
+)
+predictions <- predict(model, test.data)
+head(predictions)
+RMSE(predictions, test.data$glucose)
+#RMSE value is 23.53875
+```
+
+To interpret the statistics of the linear regression model, we make use of the number of * that indicates important impacts of predictors for ‘glucose’. The greater the number of asterisk, the higher the significance as a predictor. From Figure \@ref(fig:gg-oz-plot6), we are able to see that insulin had the highest number of * indicating its significance. To add on, it also returned the lowest p-value and the highest positive coefficient (t-value) hence leading to us concluding that insulin had the highest significance with respect to glucose, which is accurate in the scientific context. Age and blood pressure can also be seen to follow after.
+```{r gg-oz-plot6,fig.cap="Summary table of data from Linear Regression",fig.align='center'}
+knitr::include_graphics("C:/Users/Owner/OneDrive - Nanyang Technological University/Pictures/linear regression.png")
+```
+
+### Classification:Logistic Regression
+kNN for classification was considered but it was unable to interpret the effects of features in the classifier. Comparing the confusion matrix, the accuracy among Logistic, kNN and SVM methods were 79.22%, 75.32% and 77.27%. Thus, logistic regression was used as it had the highest percentage of points in the test set correctly classified. We will first convert the outcome variable ‘diabetes’ into 0,1 variable, where 0 represents ‘neg’ and 1 represents ‘pos’.
+```{r}
+#Convert outcome variable into 0,1 variable
+PimaIndiansDiabetes1<-PimaIndiansDiabetes1%>%mutate(
+  diabetes=factor(ifelse(diabetes=="pos", 1,0)))%>%
+  select(pregnant:age, diabetes)
+str(PimaIndiansDiabetes1)
+
+#split data
+set.seed(100)
+training.idx <- sample(1: nrow(PimaIndiansDiabetes1), size=nrow(PimaIndiansDiabetes1)*0.8)
+train.data <-PimaIndiansDiabetes1[training.idx, ]
+test.data <- PimaIndiansDiabetes1[-training.idx, ]
+
+#logistic regression 
+mlogit <- glm(diabetes ~pregnant+glucose+mass+pedigree, data = train.data, family = "binomial")
+summary(mlogit)
+Pred.p <-predict(mlogit, newdata =test.data, type = "response")
+y_pred_num <-ifelse(Pred.p > 0.5, 1, 0)
+y_pred <-factor(y_pred_num, levels=c(0, 1))
+#Accuracy of the classification
+mean(y_pred ==test.data$diabetes )
+table(y_pred,test.data$diabetes)
+#0.7922078
+```
+
+```{r}
+#kNN classification
+library(class)
+set.seed(101)
+knn1<-knn(train.data, test.data, cl=train.data$diabetes, k=2)
+mean(knn1 ==test.data$diabetes)
+table(knn1,test.data$diabetes)
+#0.7532468 (lower than logistic)
+```
+
+```{r}
+#SVM
+library(e1071)
+set.seed(123)
+m.svm.tune<-tune.svm(diabetes~., data=train.data, kernel="radial",cost=10^(-1:1), gamma=10^(-6:-1))
+summary(m.svm.tune)
+best.svm = m.svm.tune$best.model
+pred.svm.tune = predict(best.svm, newdata=test.data)
+table(pred.svm.tune, test.data$diabetes)
+mean(pred.svm.tune ==test.data$diabetes)
+#0.7727273
+```
+
+Logistic regression is then implemented and the summarized results are shown in Figure \@ref(fig:gg-oz-plot7).
+```{r gg-oz-plot7,fig.cap="Summary table of data from Logistic Regression",fig.align='center'}
+knitr::include_graphics("C:/Users/Owner/OneDrive - Nanyang Technological University/Pictures/Classification.png")
+```
+
+To determine whether the association between “diabetes” and the other independent variables are statistically significant, we compare the associated p-values to the level of significance, in this case we set it to 5%. From Figure \@ref(fig:gg-oz-plot7), only ‘pregnant’ , ‘glucose’ , ‘pedigree’ and ‘mass’ are important predictors for ‘diabetes’ as their p-values are smaller than 0.05. Based on the estimated coefficient, we can deduce that for every one unit change in glucose,  the odds of diabetes being positive increases by e0.031844=1.032 times. For ‘pedigree’, ‘mass’ and ‘pregnant’, the odds of being positive increases by 2.05,1.05 and 1.11 times respectively. As glucose has the highest number of * and the lowest p-value, we can now conclude that glucose contributes most significantly to the occurrence of diabetes in women.
+
+# Conclusion
+To achieve the main objective of the study, we came up with study questions for a more indepth research. Linear regression for prediction dealt with our second study question, which involved finding a variable that would most likely affect glucose directly since diabetes pertains to glucose levels. After conducting linear regression in R, we found ‘insulin’ levels to be the most significant in relation to ‘glucose’ according to the p and t values. Linear regression however is limited to linear relationships which might be inaccurate in the context of glucose and insulin as it is unlikely that their levels would increase linearly. To tackle this issue, we can consider adding polynomial terms to model the nonlinear relationship.
+
+Logistic regression for classification dealt with our main objective by analysing the p-values and the estimated coefficient. From this, we concluded that ‘pregnant’, ‘glucose’, ‘pedigree’ and ‘mass’ are significant predictors having important impacts on ‘diabetes’. The limitations of logistic regression, however, requires no multicollinearity between independent variables and it is tough to obtain complex relationships. A possible way to prevent multicollinearity and to improve the performance is to remove  ‘pressure’, ‘triceps’, ‘insulin’ and ‘age’  from the logistic model, since their p-values show that they are not statistically significant. 
+
+Hence, by applying the suggestions above to future research, it would return more realistic and appropriate values so as to achieve a more holistic and accurate overview of the results of our study.
+
+# References
+1. C Bogardus.,S Lillioja. (1992). Pima Indians as a model to study the genetics of NIDDM. J Cell Biochem,48(4).https://pubmed.ncbi.nlm.nih.gov/1577873/ 
+2. Newman, D.J. & Hettich, S. & Blake, C.L. & Merz, C.J. (1998). UCI Repository of machine learning databases [ http://www.ics.uci.edu/~mlearn/MLRepository.html ]. Irvine, CA: University of California, Department of Information and Computer Science. 
+3. Diabetes and Women. (2018, September 17). Centers for Disease Control and Prevention. https://www.cdc.gov/diabetes/library/features/diabetes-and-women.html
+4. Diabetes in Singapore. (2021, January 18). Ministry Of Health. https://www.healthhub.sg/a-z/diseases-and-conditions/626/diabetes
+5. Diabetes. (2021, April 13). World Health Organization. https://www.who.int/news-room/fact-sheets/detail/diabetes
+6. Alexander K., Matthias T. (2016). Imputation with the R Package VIM.Journal of Statistical Software,74(7),7-9. https://www.jstatsoft.org/article/view/v074i07/v74i07.pdf
+
